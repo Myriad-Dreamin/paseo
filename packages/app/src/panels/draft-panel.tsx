@@ -2,7 +2,7 @@ import { SquarePen } from "lucide-react-native";
 import { useCallback } from "react";
 import invariant from "tiny-invariant";
 import { WorkspaceDraftAgentTab } from "@/screens/workspace/workspace-draft-agent-tab";
-import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
+import { type OpenWorkspaceFileInput, usePaneContext, usePaneFocus } from "@/panels/pane-context";
 import type { PanelRegistration } from "@/panels/panel-registry";
 import { useSessionStore } from "@/stores/session-store";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
@@ -31,8 +31,8 @@ function DraftPanel() {
   invariant(target.kind === "draft", "DraftPanel requires draft target");
 
   const handleOpenWorkspaceFile = useCallback(
-    ({ filePath }: { filePath: string }) => {
-      openFileInWorkspace(filePath);
+    (input: OpenWorkspaceFileInput) => {
+      openFileInWorkspace(input);
     },
     [openFileInWorkspace],
   );

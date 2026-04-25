@@ -12,7 +12,7 @@ export type WorkspaceTabTarget =
   | { kind: "agent"; agentId: string }
   | { kind: "terminal"; terminalId: string }
   | { kind: "browser"; browserId: string }
-  | { kind: "file"; path: string }
+  | { kind: "file"; path: string; lineStart?: number; columnStart?: number }
   | { kind: "setup"; workspaceId: string };
 
 export interface WorkspaceTab {
@@ -152,7 +152,12 @@ function coerceWorkspaceTabTarget(raw: Record<string, unknown>): WorkspaceTabTar
     return normalizeWorkspaceTabTarget({ kind: "browser", browserId: raw.browserId });
   }
   if (kind === "file" && typeof raw.path === "string") {
-    return normalizeWorkspaceTabTarget({ kind: "file", path: raw.path });
+    return normalizeWorkspaceTabTarget({
+      kind: "file",
+      path: raw.path,
+      lineStart: typeof raw.lineStart === "number" ? raw.lineStart : undefined,
+      columnStart: typeof raw.columnStart === "number" ? raw.columnStart : undefined,
+    });
   }
   if (kind === "setup" && typeof raw.workspaceId === "string") {
     return normalizeWorkspaceTabTarget({ kind: "setup", workspaceId: raw.workspaceId });

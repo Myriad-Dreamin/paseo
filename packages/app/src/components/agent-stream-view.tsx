@@ -242,7 +242,11 @@ export interface AgentStreamViewProps {
   routeBottomAnchorRequest?: BottomAnchorRouteRequest | null;
   isAuthoritativeHistoryReady?: boolean;
   toast?: ToastApi | null;
-  onOpenWorkspaceFile?: (input: { filePath: string }) => void;
+  onOpenWorkspaceFile?: (input: {
+    filePath: string;
+    lineStart?: number;
+    columnStart?: number;
+  }) => void;
 }
 
 const EMPTY_STREAM_HEAD: StreamItem[] = [];
@@ -304,6 +308,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     });
     const openWorkspaceFile = useStableEvent(function openWorkspaceFile(input: {
       filePath: string;
+      lineStart?: number;
+      columnStart?: number;
     }) {
       onOpenWorkspaceFile?.(input);
     });
@@ -335,7 +341,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
         if (normalized.file) {
           if (onOpenWorkspaceFile) {
-            openWorkspaceFile({ filePath: normalized.file });
+            openWorkspaceFile({
+              filePath: normalized.file,
+              lineStart: target.lineStart,
+              columnStart: target.columnStart,
+            });
             return;
           }
 
@@ -343,7 +353,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             navigateToPreparedWorkspaceTab({
               serverId: resolvedServerId,
               workspaceId,
-              target: { kind: "file", path: normalized.file },
+              target: {
+                kind: "file",
+                path: normalized.file,
+                lineStart: target.lineStart,
+                columnStart: target.columnStart,
+              },
             });
           }
           return;

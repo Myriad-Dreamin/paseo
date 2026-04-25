@@ -61,6 +61,7 @@ import { WorkspaceScriptsButton } from "@/screens/workspace/workspace-scripts-bu
 import { WorkspaceImportSheet } from "@/screens/workspace/workspace-import-sheet";
 import { ExplorerSidebarAnimationProvider } from "@/contexts/explorer-sidebar-animation-context";
 import { useToast } from "@/contexts/toast-context";
+import type { OpenWorkspaceFileInput } from "@/panels/pane-context";
 import { useExplorerOpenGesture } from "@/hooks/use-explorer-open-gesture";
 import { selectIsFileExplorerOpen, usePanelStore } from "@/stores/panel-store";
 import { type ExplorerCheckoutContext } from "@/stores/explorer-checkout-context";
@@ -2028,14 +2029,32 @@ function WorkspaceScreenContent({
   );
 
   const handleOpenFileFromChat = useCallback(
-    ({ filePath }: { filePath: string }) => {
+    ({ filePath, lineStart, columnStart }: OpenWorkspaceFileInput) => {
       const normalizedFilePath = filePath.trim();
       if (!normalizedFilePath) {
         return;
       }
-      handleOpenFileFromExplorer(normalizedFilePath);
+      if (isMobile) {
+        showMobileAgent();
+      }
+      if (!persistenceKey) {
+        return;
+      }
+      const target = normalizeWorkspaceTabTarget({
+        kind: "file",
+        path: normalizedFilePath,
+        lineStart,
+        columnStart,
+      });
+      if (!target || target.kind !== "file") {
+        return;
+      }
+      const tabId = openWorkspaceTabFocused(persistenceKey, target);
+      if (tabId) {
+        navigateToTabId(tabId);
+      }
     },
-    [handleOpenFileFromExplorer],
+    [isMobile, navigateToTabId, openWorkspaceTabFocused, persistenceKey, showMobileAgent],
   );
 
   const [_hoveredTabKey, setHoveredTabKey] = useState<string | null>(null);
@@ -2706,11 +2725,11 @@ function WorkspaceScreenContent({
           }
           retargetWorkspaceTab(persistenceKey, input.tab.tabId, target);
         },
-        onOpenWorkspaceFile: (filePath) => {
+        onOpenWorkspaceFile: (fileInput) => {
           if (input.focusPaneBeforeOpen && input.paneId && persistenceKey) {
             focusWorkspacePane(persistenceKey, input.paneId);
           }
-          handleOpenFileFromChat({ filePath });
+          handleOpenFileFromChat(fileInput);
         },
         onOpenImportSheet: openImportSheet,
       }),

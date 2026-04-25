@@ -7,6 +7,7 @@ import { Composer } from "@/components/composer";
 import { ComposerImportPill } from "@/screens/workspace/composer-import-pill";
 import { FileDropZone } from "@/components/file-drop-zone";
 import { AgentStreamView } from "@/components/agent-stream-view";
+import type { OpenWorkspaceFileInput } from "@/panels/pane-context";
 import { composerWorkspaceAttachment } from "@/attachments/composer-workspace-attachments";
 import type { ImageAttachment } from "@/components/message-input";
 import { useAgentInputDraft } from "@/hooks/use-agent-input-draft";
@@ -278,7 +279,7 @@ interface WorkspaceDraftAgentTabProps {
   draftId: string;
   isPaneFocused: boolean;
   onCreated: (snapshot: AgentSnapshotPayload) => void;
-  onOpenWorkspaceFile: (input: { filePath: string }) => void;
+  onOpenWorkspaceFile: (input: OpenWorkspaceFileInput) => void;
   onOpenImportSheet?: () => void;
 }
 
