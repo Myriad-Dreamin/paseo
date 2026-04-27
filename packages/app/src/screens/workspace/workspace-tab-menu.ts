@@ -29,6 +29,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   menuTestIDBase: string;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
+  onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsBefore: (tabId: string) => Promise<void> | void;
@@ -42,6 +43,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   tabCount: number;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
+  onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
@@ -101,6 +103,7 @@ export function buildWorkspaceTabMenuEntries(
     menuTestIDBase,
     onCopyResumeCommand,
     onCopyAgentId,
+    onCopyFilePath,
     onReloadAgent,
     onCloseTab,
     onCloseTabsBefore,
@@ -133,6 +136,24 @@ export function buildWorkspaceTabMenuEntries(
       testID: `${menuTestIDBase}-copy-agent-id`,
       onSelect: () => {
         void onCopyAgentId(agentId);
+      },
+    });
+    entries.push({
+      kind: "separator",
+      key: "copy-separator",
+    });
+  }
+
+  if (tab.target.kind === "file") {
+    const { path } = tab.target;
+    entries.push({
+      kind: "item",
+      key: "copy-path",
+      label: "Copy path",
+      icon: "copy",
+      testID: `${menuTestIDBase}-copy-path`,
+      onSelect: () => {
+        void onCopyFilePath(path);
       },
     });
     entries.push({
@@ -216,6 +237,7 @@ export function buildWorkspaceDesktopTabActions(
       menuTestIDBase: contextMenuTestId,
       onCopyResumeCommand: input.onCopyResumeCommand,
       onCopyAgentId: input.onCopyAgentId,
+      onCopyFilePath: input.onCopyFilePath,
       onReloadAgent: input.onReloadAgent,
       onCloseTab: input.onCloseTab,
       onCloseTabsBefore: input.onCloseTabsToLeft,

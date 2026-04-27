@@ -290,6 +290,7 @@ interface MobileWorkspaceTabSwitcherProps {
   onSelectSwitcherTab: (key: string) => void;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
+  onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsAbove: (tabId: string) => Promise<void> | void;
@@ -466,6 +467,7 @@ function MobileWorkspaceTabOption({
   onPress,
   onCopyResumeCommand,
   onCopyAgentId,
+  onCopyFilePath,
   onReloadAgent,
   onCloseTab,
   onCloseTabsAbove,
@@ -482,6 +484,7 @@ function MobileWorkspaceTabOption({
   onPress: () => void;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
+  onCopyFilePath: (path: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsAbove: (tabId: string) => Promise<void> | void;
@@ -497,6 +500,7 @@ function MobileWorkspaceTabOption({
     menuTestIDBase,
     onCopyResumeCommand,
     onCopyAgentId,
+    onCopyFilePath,
     onReloadAgent,
     onCloseTab,
     onCloseTabsBefore: onCloseTabsAbove,
@@ -551,6 +555,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
   onSelectSwitcherTab,
   onCopyResumeCommand,
   onCopyAgentId,
+  onCopyFilePath,
   onReloadAgent,
   onCloseTab,
   onCloseTabsAbove,
@@ -604,6 +609,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
           onPress={onPress}
           onCopyResumeCommand={onCopyResumeCommand}
           onCopyAgentId={onCopyAgentId}
+          onCopyFilePath={onCopyFilePath}
           onReloadAgent={onReloadAgent}
           onCloseTab={onCloseTab}
           onCloseTabsAbove={onCloseTabsAbove}
@@ -620,6 +626,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
       normalizedWorkspaceId,
       onCopyResumeCommand,
       onCopyAgentId,
+      onCopyFilePath,
       onReloadAgent,
       onCloseTab,
       onCloseTabsAbove,
@@ -2286,6 +2293,19 @@ function WorkspaceScreenContent({
     [toast],
   );
 
+  const handleCopyFilePath = useCallback(
+    async (path: string) => {
+      if (!path) return;
+      try {
+        await Clipboard.setStringAsync(path);
+        toast.copied("File path");
+      } catch {
+        toast.error("Copy failed");
+      }
+    },
+    [toast],
+  );
+
   const handleCopyResumeCommand = useCallback(
     async (agentId: string) => {
       if (!agentId) return;
@@ -3076,6 +3096,7 @@ function WorkspaceScreenContent({
         onCloseTab={handleCloseTabById}
         onCopyResumeCommand={handleCopyResumeCommand}
         onCopyAgentId={handleCopyAgentId}
+        onCopyFilePath={handleCopyFilePath}
         onReloadAgent={handleReloadAgent}
         onCloseTabsToLeft={handleCloseTabsToLeftInPane}
         onCloseTabsToRight={handleCloseTabsToRightInPane}
@@ -3110,6 +3131,7 @@ function WorkspaceScreenContent({
     handleCloseTabById,
     handleCopyResumeCommand,
     handleCopyAgentId,
+    handleCopyFilePath,
     handleReloadAgent,
     handleCloseTabsToLeftInPane,
     handleCloseTabsToRightInPane,
@@ -3192,6 +3214,7 @@ function WorkspaceScreenContent({
                   onSelectSwitcherTab={handleSelectSwitcherTab}
                   onCopyResumeCommand={handleCopyResumeCommand}
                   onCopyAgentId={handleCopyAgentId}
+                  onCopyFilePath={handleCopyFilePath}
                   onReloadAgent={handleReloadAgent}
                   onCloseTab={handleCloseTabById}
                   onCloseTabsAbove={handleCloseTabsToLeft}
@@ -3213,6 +3236,7 @@ function WorkspaceScreenContent({
                   onCloseTab={handleCloseTabById}
                   onCopyResumeCommand={handleCopyResumeCommand}
                   onCopyAgentId={handleCopyAgentId}
+                  onCopyFilePath={handleCopyFilePath}
                   onReloadAgent={handleReloadAgent}
                   onCloseTabsToLeft={handleCloseTabsToLeft}
                   onCloseTabsToRight={handleCloseTabsToRight}
