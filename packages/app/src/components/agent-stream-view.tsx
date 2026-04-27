@@ -243,6 +243,7 @@ export interface AgentStreamViewProps {
   isAuthoritativeHistoryReady?: boolean;
   toast?: ToastApi | null;
   onOpenWorkspaceFile?: (input: {
+    directory?: string;
     filePath: string;
     lineStart?: number;
     columnStart?: number;
@@ -307,6 +308,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       toast,
     });
     const openWorkspaceFile = useStableEvent(function openWorkspaceFile(input: {
+      directory?: string;
       filePath: string;
       lineStart?: number;
       columnStart?: number;
@@ -342,6 +344,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         if (normalized.file) {
           if (onOpenWorkspaceFile) {
             openWorkspaceFile({
+              directory: normalized.directory,
               filePath: normalized.file,
               lineStart: target.lineStart,
               columnStart: target.columnStart,
@@ -355,6 +358,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
               workspaceId,
               target: {
                 kind: "file",
+                directory: normalized.directory,
                 path: normalized.file,
                 lineStart: target.lineStart,
                 columnStart: target.columnStart,

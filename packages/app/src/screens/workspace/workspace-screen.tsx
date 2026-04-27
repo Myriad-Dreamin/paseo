@@ -122,6 +122,7 @@ import {
   type WorkspaceTabMenuEntry,
 } from "@/screens/workspace/workspace-tab-menu";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import { resolveWorkspaceFileCopyPath } from "@/utils/workspace-file-copy-path";
 import {
   resolveWorkspaceHeaderRenderState,
   type WorkspaceHeaderCheckoutState,
@@ -290,7 +291,7 @@ interface MobileWorkspaceTabSwitcherProps {
   onSelectSwitcherTab: (key: string) => void;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
-  onCopyFilePath: (path: string) => Promise<void> | void;
+  onCopyFilePath: (input: { path: string; directory?: string }) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsAbove: (tabId: string) => Promise<void> | void;
@@ -484,7 +485,7 @@ function MobileWorkspaceTabOption({
   onPress: () => void;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
-  onCopyFilePath: (path: string) => Promise<void> | void;
+  onCopyFilePath: (input: { path: string; directory?: string }) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCloseTabsAbove: (tabId: string) => Promise<void> | void;
@@ -2027,7 +2028,10 @@ function WorkspaceScreenContent({
       if (!persistenceKey) {
         return;
       }
-      const tabId = openWorkspaceTabFocused(persistenceKey, { kind: "file", path: filePath });
+      const tabId = openWorkspaceTabFocused(persistenceKey, {
+        kind: "file",
+        path: filePath,
+      });
       if (tabId) {
         navigateToTabId(tabId);
       }
@@ -2036,7 +2040,7 @@ function WorkspaceScreenContent({
   );
 
   const handleOpenFileFromChat = useCallback(
-    ({ filePath, lineStart, columnStart }: OpenWorkspaceFileInput) => {
+    ({ directory, filePath, lineStart, columnStart }: OpenWorkspaceFileInput) => {
       const normalizedFilePath = filePath.trim();
       if (!normalizedFilePath) {
         return;
@@ -2049,6 +2053,7 @@ function WorkspaceScreenContent({
       }
       const target = normalizeWorkspaceTabTarget({
         kind: "file",
+        directory,
         path: normalizedFilePath,
         lineStart,
         columnStart,
@@ -2294,7 +2299,11 @@ function WorkspaceScreenContent({
   );
 
   const handleCopyFilePath = useCallback(
-    async (path: string) => {
+    async (input: { path: string; directory?: string }) => {
+      const path = resolveWorkspaceFileCopyPath({
+        ...input,
+        workspaceDirectory,
+      });
       if (!path) return;
       try {
         await Clipboard.setStringAsync(path);
@@ -2303,7 +2312,7 @@ function WorkspaceScreenContent({
         toast.error("Copy failed");
       }
     },
-    [toast],
+    [toast, workspaceDirectory],
   );
 
   const handleCopyResumeCommand = useCallback(
