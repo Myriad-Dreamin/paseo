@@ -5,6 +5,7 @@ export interface InlinePathTarget {
   path: string;
   lineStart?: number;
   lineEnd?: number;
+  columnStart?: number;
 }
 
 const FILE_PROTOCOL = "file:";
@@ -66,6 +67,16 @@ const ASSISTANT_FILE_EXTENSIONS = new Set([
   "yml",
   "zsh",
 ]);
+const INLINE_PATH_LINE_COLUMN_SUFFIX = /^(.+):([0-9]+):([0-9]+)$/;
+const INLINE_PATH_LINE_RANGE_SUFFIX = /^(.+):([0-9]+)-([0-9]+)$/;
+const INLINE_PATH_LINE_SUFFIX = /^(.+):([0-9]+)$/;
+
+interface PathLocationSuffixMatch {
+  basePathRaw: string;
+  lineStartRaw: string;
+  lineEndRaw?: string;
+  columnStartRaw?: string;
+}
 
 export interface AssistantHrefParseOptions {
   workspaceRoot?: string;
@@ -124,11 +135,131 @@ function parseLineFragment(value: string): Pick<InlinePathTarget, "lineStart" | 
   return { lineStart, lineEnd };
 }
 
+function matchPathLocationSuffix(value: string): PathLocationSuffixMatch | null {
+  const columnMatch = value.match(INLINE_PATH_LINE_COLUMN_SUFFIX);
+  if (columnMatch) {
+    return {
+      basePathRaw: columnMatch[1] ?? "",
+      lineStartRaw: columnMatch[2] ?? "",
+      columnStartRaw: columnMatch[3],
+    };
+  }
+
+  const rangeMatch = value.match(INLINE_PATH_LINE_RANGE_SUFFIX);
+  if (rangeMatch) {
+    return {
+      basePathRaw: rangeMatch[1] ?? "",
+      lineStartRaw: rangeMatch[2] ?? "",
+      lineEndRaw: rangeMatch[3],
+    };
+  }
+
+  const lineMatch = value.match(INLINE_PATH_LINE_SUFFIX);
+  if (!lineMatch) {
+    return null;
+  }
+
+  return {
+    basePathRaw: lineMatch[1] ?? "",
+    lineStartRaw: lineMatch[2] ?? "",
+  };
+}
+
+function parsePositiveIntegerToken(value: string | undefined): number | null {
+  const parsed = parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseLineEndToken(
+  value: string | undefined,
+  lineStart: number,
+): number | undefined | null {
+  if (!value) {
+    return undefined;
+  }
+  const lineEnd = parsePositiveIntegerToken(value);
+  if (!lineEnd || lineEnd < lineStart) {
+    return null;
+  }
+  return lineEnd;
+}
+
+function parseColumnStartToken(value: string | undefined): number | undefined | null {
+  if (!value) {
+    return undefined;
+  }
+  return parsePositiveIntegerToken(value);
+}
+
+function parsePathLocationSuffix(
+  value: string,
+): Pick<InlinePathTarget, "path" | "lineStart" | "lineEnd" | "columnStart"> | null {
+  const match = matchPathLocationSuffix(value);
+  if (!match) {
+    return null;
+  }
+
+  const basePathRaw = match.basePathRaw.trim();
+  if (!basePathRaw) {
+    return null;
+  }
+
+  const normalizedPath = normalizePathToken(basePathRaw);
+  if (!normalizedPath) {
+    return null;
+  }
+
+  const lineStart = parsePositiveIntegerToken(match.lineStartRaw);
+  if (!lineStart) {
+    return null;
+  }
+
+  const lineEnd = parseLineEndToken(match.lineEndRaw, lineStart);
+  if (lineEnd === null) {
+    return null;
+  }
+
+  const columnStart = parseColumnStartToken(match.columnStartRaw);
+  if (columnStart === null) {
+    return null;
+  }
+
+  return {
+    path: normalizedPath,
+    lineStart,
+    lineEnd,
+    ...(columnStart ? { columnStart } : {}),
+  };
+}
+
+function parseHrefPathAndLines(
+  pathValue: string,
+  hash: string,
+): Pick<InlinePathTarget, "path" | "lineStart" | "lineEnd" | "columnStart"> | null {
+  const fragmentLines = parseLineFragment(hash);
+  if (!fragmentLines) {
+    return null;
+  }
+
+  const suffixLocation = parsePathLocationSuffix(pathValue);
+  if (!hash) {
+    if (suffixLocation) {
+      return suffixLocation;
+    }
+  }
+
+  return {
+    path: suffixLocation?.path ?? pathValue,
+    ...fragmentLines,
+  };
+}
+
 /**
  * Strict VSCode-style markers only.
  *
  * Supported:
  * - `filename:linenumber`
+ * - `filename:linenumber:columnnumber`
  * - `filename:lineStart-lineEnd`
  *
  * Not supported (by design):
@@ -142,46 +273,19 @@ export function parseInlinePathToken(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const match = trimmed.match(/^(.+?):([0-9]+)(?:-([0-9]+))?$/);
-  if (!match) {
-    return null;
-  }
-
-  const basePathRaw = match[1]?.trim();
-  if (!basePathRaw) {
-    return null;
-  }
-
   // Avoid accidentally treating URLs as file paths.
-  if (basePathRaw.includes("://")) {
+  if (trimmed.includes("://")) {
     return null;
   }
 
-  const normalizedPath = normalizePathToken(basePathRaw);
-  if (!normalizedPath) {
+  const location = parsePathLocationSuffix(trimmed);
+  if (!location) {
     return null;
-  }
-
-  const lineStart = parseInt(match[2], 10);
-  if (!Number.isFinite(lineStart) || lineStart <= 0) {
-    return null;
-  }
-
-  const lineEnd = match[3] ? parseInt(match[3], 10) : undefined;
-  if (lineEnd !== undefined) {
-    if (!Number.isFinite(lineEnd) || lineEnd <= 0) {
-      return null;
-    }
-    if (lineEnd < lineStart) {
-      return null;
-    }
   }
 
   return {
     raw: rawValue,
-    path: normalizedPath,
-    lineStart,
-    lineEnd,
+    ...location,
   };
 }
 
@@ -207,15 +311,14 @@ export function parseFileProtocolUrl(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const lines = parseLineFragment(parsedUrl.hash);
-  if (!lines) {
+  const hrefPath = parseHrefPathAndLines(normalizedPath, parsedUrl.hash);
+  if (!hrefPath) {
     return null;
   }
 
   return {
     raw: value,
-    path: normalizedPath,
-    ...lines,
+    ...hrefPath,
   };
 }
 
@@ -240,6 +343,96 @@ function parseAssistantInlinePathLink(
   return {
     ...inlinePathTarget,
     path: normalizedPath,
+  };
+}
+
+function parseWindowsAssistantFileLink(
+  raw: string,
+  trimmed: string,
+  options: AssistantHrefParseOptions,
+): InlinePathTarget | null {
+  const windowsPathMatch = trimmed.match(/^([A-Za-z]:[\\/][^?#]*)(#[^?]+)?$/);
+  if (!windowsPathMatch) {
+    return null;
+  }
+
+  const normalizedPath = normalizePathToken(windowsPathMatch[1] ?? "");
+  const hrefPath = normalizedPath
+    ? parseHrefPathAndLines(normalizedPath, windowsPathMatch[2] ?? "")
+    : null;
+  if (!hrefPath || !isAllowedAbsolutePath(hrefPath.path, options.workspaceRoot)) {
+    return null;
+  }
+
+  return {
+    raw,
+    ...hrefPath,
+  };
+}
+
+function parseRelativeLocationAssistantFileLink(
+  raw: string,
+  trimmed: string,
+  options: AssistantHrefParseOptions,
+): InlinePathTarget | null {
+  const relativeLocation = parsePathLocationSuffix(trimmed);
+  if (!relativeLocation || isAbsolutePath(relativeLocation.path)) {
+    return null;
+  }
+
+  if (!isPlausibleAssistantLocalPath(relativeLocation.path)) {
+    return null;
+  }
+
+  const workspaceRoot = normalizePathInput(options.workspaceRoot);
+  if (!workspaceRoot) {
+    return {
+      raw,
+      ...relativeLocation,
+    };
+  }
+
+  const normalizedPath = resolveRelativePathUnderRoot(relativeLocation.path, workspaceRoot);
+  if (!normalizedPath) {
+    return null;
+  }
+
+  return {
+    raw,
+    ...relativeLocation,
+    path: normalizedPath,
+  };
+}
+
+function parseAbsoluteAssistantFileLink(
+  raw: string,
+  trimmed: string,
+  options: AssistantHrefParseOptions,
+): InlinePathTarget | null {
+  if (!isAbsolutePath(trimmed)) {
+    return null;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmed, "http://paseo.invalid");
+  } catch {
+    return null;
+  }
+
+  const normalizedPath = normalizePathToken(decodeURIComponent(parsedUrl.pathname));
+  const hrefPath = normalizedPath ? parseHrefPathAndLines(normalizedPath, parsedUrl.hash) : null;
+  if (!hrefPath || !isAbsolutePath(hrefPath.path)) {
+    return null;
+  }
+
+  if (!isAllowedAbsolutePath(hrefPath.path, options.workspaceRoot)) {
+    return null;
+  }
+
+  return {
+    raw,
+    ...hrefPath,
   };
 }
 
@@ -303,23 +496,14 @@ export function parseAssistantFileLink(
     return inlinePathTarget;
   }
 
-  const windowsPathMatch = trimmed.match(/^([A-Za-z]:[\\/][^?#]*)(#[^?]+)?$/);
-  if (windowsPathMatch) {
-    const normalizedPath = normalizePathToken(windowsPathMatch[1] ?? "");
-    if (!normalizedPath || !isAllowedAbsolutePath(normalizedPath, options.workspaceRoot)) {
-      return null;
-    }
+  const windowsTarget = parseWindowsAssistantFileLink(value, trimmed, options);
+  if (windowsTarget) {
+    return windowsTarget;
+  }
 
-    const lines = parseLineFragment(windowsPathMatch[2] ?? "");
-    if (!lines) {
-      return null;
-    }
-
-    return {
-      raw: value,
-      path: normalizedPath,
-      ...lines,
-    };
+  const relativeLocationTarget = parseRelativeLocationAssistantFileLink(value, trimmed, options);
+  if (relativeLocationTarget) {
+    return relativeLocationTarget;
   }
 
   const relativeTarget = parseWorkspaceRelativeFileLink(trimmed, {
@@ -329,36 +513,7 @@ export function parseAssistantFileLink(
     return relativeTarget;
   }
 
-  if (!isAbsolutePath(trimmed)) {
-    return null;
-  }
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(trimmed, "http://paseo.invalid");
-  } catch {
-    return null;
-  }
-
-  const normalizedPath = normalizePathToken(decodeURIComponent(parsedUrl.pathname));
-  if (!normalizedPath || !isAbsolutePath(normalizedPath)) {
-    return null;
-  }
-
-  if (!isAllowedAbsolutePath(normalizedPath, options.workspaceRoot)) {
-    return null;
-  }
-
-  const lines = parseLineFragment(parsedUrl.hash);
-  if (!lines) {
-    return null;
-  }
-
-  return {
-    raw: value,
-    path: normalizedPath,
-    ...lines,
-  };
+  return parseAbsoluteAssistantFileLink(value, trimmed, options);
 }
 
 export function isFileLookingAssistantToken(value: string): boolean {
@@ -403,7 +558,7 @@ function parseWorkspaceRelativeFileLink(
 
 function parseLocalPathParts(
   value: string,
-): { path: string; lines: Pick<InlinePathTarget, "lineStart" | "lineEnd"> } | null {
+): { path: string; lines: Pick<InlinePathTarget, "lineStart" | "lineEnd" | "columnStart"> } | null {
   const normalized = normalizePathToken(value);
   if (!normalized || normalized.includes("?")) {
     return null;
@@ -428,6 +583,7 @@ function parseLocalPathParts(
       lines: {
         lineStart: inlinePathTarget.lineStart,
         lineEnd: inlinePathTarget.lineEnd,
+        columnStart: inlinePathTarget.columnStart,
       },
     };
   }

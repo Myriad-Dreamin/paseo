@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FileReadResult } from "@server/client/daemon-client";
 import Markdown, { MarkdownIt } from "react-native-markdown-display";
@@ -38,6 +38,8 @@ interface CodeLineProps {
   gutterWidth: number;
   colorMap: Record<HighlightStyle, string>;
   baseColor: string;
+  isTargetLine: boolean;
+  targetGutterColor: string;
 }
 
 interface FilePreviewBodyProps {
@@ -46,8 +48,13 @@ interface FilePreviewBodyProps {
   showDesktopWebScrollbar: boolean;
   isMobile: boolean;
   filePath: string;
+  lineStart?: number;
+  columnStart?: number;
   imagePreviewUri: string | null;
 }
+
+const CODE_LINE_HEIGHT_MULTIPLIER = 1.45;
+const TARGET_LINE_CONTEXT_LINES = 3;
 
 function trimNonEmpty(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
@@ -105,18 +112,29 @@ const CodeLine = React.memo(function CodeLine({
   gutterWidth,
   colorMap,
   baseColor,
+  isTargetLine,
+  targetGutterColor,
 }: CodeLineProps) {
+  const lineStyle = useMemo(
+    () => [codeLineStyles.line, isTargetLine && codeLineStyles.targetLine],
+    [isTargetLine],
+  );
   const gutterStyle = useMemo(() => [codeLineStyles.gutter, { width: gutterWidth }], [gutterWidth]);
+  const gutterTextColor = isTargetLine ? targetGutterColor : baseColor;
   const gutterTextStyle = useMemo(
-    () => [codeLineStyles.gutterText, { color: baseColor }],
-    [baseColor],
+    () => [
+      codeLineStyles.gutterText,
+      { color: gutterTextColor },
+      isTargetLine && codeLineStyles.targetGutterText,
+    ],
+    [gutterTextColor, isTargetLine],
   );
   const keyedTokens = useMemo(
     () => tokens.map((token, index) => ({ key: `${index}-${token.text}`, token })),
     [tokens],
   );
   return (
-    <View style={codeLineStyles.line}>
+    <View style={lineStyle}>
       <View style={gutterStyle}>
         <Text numberOfLines={1} style={gutterTextStyle}>
           {String(lineNumber)}
@@ -148,6 +166,12 @@ function CodeLineToken({ color, text }: CodeLineTokenProps) {
 const codeLineStyles = StyleSheet.create((theme) => ({
   line: {
     flexDirection: "row",
+    borderLeftWidth: 2,
+    borderLeftColor: "transparent",
+  },
+  targetLine: {
+    backgroundColor: theme.colors.surface2,
+    borderLeftColor: theme.colors.primary,
   },
   gutter: {
     alignItems: "flex-end",
@@ -157,14 +181,17 @@ const codeLineStyles = StyleSheet.create((theme) => ({
   gutterText: {
     fontFamily: Fonts.mono,
     fontSize: theme.fontSize.sm,
-    lineHeight: theme.fontSize.sm * 1.45,
+    lineHeight: theme.fontSize.sm * CODE_LINE_HEIGHT_MULTIPLIER,
     opacity: 0.4,
     userSelect: "none",
+  },
+  targetGutterText: {
+    opacity: 1,
   },
   lineText: {
     fontFamily: Fonts.mono,
     fontSize: theme.fontSize.sm,
-    lineHeight: theme.fontSize.sm * 1.45,
+    lineHeight: theme.fontSize.sm * CODE_LINE_HEIGHT_MULTIPLIER,
     flex: 1,
   },
 }));
@@ -175,6 +202,8 @@ function FilePreviewBody({
   showDesktopWebScrollbar,
   isMobile,
   filePath,
+  lineStart,
+  columnStart: _columnStart,
   imagePreviewUri,
 }: FilePreviewBodyProps) {
   const { theme } = useUnistyles();
@@ -183,7 +212,14 @@ function FilePreviewBody({
   const baseColor = isDark ? "#c9d1d9" : "#24292f";
   const markdownStyles = useMemo(() => createMarkdownStyles(theme), [theme]);
   const markdownParser = useMemo(() => MarkdownIt({ typographer: true, linkify: true }), []);
-  const isMarkdownFile = preview?.kind === "text" && isRenderedMarkdownFile(filePath);
+  const targetLine = useMemo(() => {
+    if (!lineStart || !Number.isFinite(lineStart) || lineStart <= 0) {
+      return null;
+    }
+    return Math.floor(lineStart);
+  }, [lineStart]);
+  const isMarkdownFile =
+    preview?.kind === "text" && !targetLine && isRenderedMarkdownFile(filePath);
 
   const previewScrollRef = useRef<RNScrollView>(null);
   const webScrollbarStyle = useWebScrollbarStyle();
@@ -203,6 +239,30 @@ function FilePreviewBody({
     if (!highlightedLines) return 0;
     return lineNumberGutterWidth(highlightedLines.length, theme.fontSize.sm);
   }, [highlightedLines, theme.fontSize.sm]);
+  const boundedTargetLine = useMemo(() => {
+    if (!targetLine || !highlightedLines?.length) {
+      return null;
+    }
+    return Math.min(targetLine, highlightedLines.length);
+  }, [highlightedLines, targetLine]);
+  const codeLineHeight = theme.fontSize.sm * CODE_LINE_HEIGHT_MULTIPLIER;
+  const previewPadding = theme.spacing[4];
+
+  useEffect(() => {
+    if (!boundedTargetLine || !preview || preview.kind !== "text" || isMarkdownFile) {
+      return;
+    }
+
+    const offsetY = Math.max(
+      0,
+      previewPadding + (boundedTargetLine - 1 - TARGET_LINE_CONTEXT_LINES) * codeLineHeight,
+    );
+    const timer = setTimeout(() => {
+      previewScrollRef.current?.scrollTo({ y: offsetY, animated: false });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [boundedTargetLine, codeLineHeight, isMarkdownFile, preview, previewPadding]);
 
   const imageSource = useMemo(
     () => (imagePreviewUri ? { uri: imagePreviewUri } : null),
@@ -265,6 +325,8 @@ function FilePreviewBody({
             gutterWidth={gutterWidth}
             colorMap={colorMap}
             baseColor={baseColor}
+            isTargetLine={boundedTargetLine === lineNumber}
+            targetGutterColor={theme.colors.primary}
           />
         ))}
       </View>
@@ -345,10 +407,14 @@ export function FilePane({
   serverId,
   workspaceRoot,
   filePath,
+  lineStart,
+  columnStart,
 }: {
   serverId: string;
   workspaceRoot: string;
   filePath: string;
+  lineStart?: number;
+  columnStart?: number;
 }) {
   const isMobile = useIsCompactFormFactor();
   const showDesktopWebScrollbar = isWeb && !isMobile;
@@ -399,6 +465,8 @@ export function FilePane({
         showDesktopWebScrollbar={showDesktopWebScrollbar}
         isMobile={isMobile}
         filePath={filePath}
+        lineStart={lineStart}
+        columnStart={columnStart}
         imagePreviewUri={imagePreviewUri}
       />
     </View>
