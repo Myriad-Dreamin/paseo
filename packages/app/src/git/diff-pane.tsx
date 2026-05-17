@@ -867,10 +867,12 @@ const DiffFileHeader = memo(function DiffFileHeader({
     () => [styles.fileSectionHeaderContainer, isExpanded && styles.fileSectionHeaderExpanded],
     [isExpanded],
   );
+  const fileHeaderTitleProps = isWeb ? { title: file.path } : {};
 
   return (
     <View style={containerStyle} onLayout={handleLayout} testID={testID}>
       <Pressable
+        {...fileHeaderTitleProps}
         testID={testID ? `${testID}-toggle` : undefined}
         style={fileHeaderPressableStyle}
         // Android: prevent parent pan/scroll gestures from canceling the tap release.
