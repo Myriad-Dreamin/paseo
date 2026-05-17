@@ -68,6 +68,7 @@ import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-stor
 import {
   buildWorkspaceTabPersistenceKey,
   collectAllTabs,
+  createDefaultLayout,
   getFocusedBrowserId,
   type WorkspaceLayout,
   useWorkspaceLayoutStore,
@@ -1673,14 +1674,24 @@ function WorkspaceScreenContent({
     persistenceKey ? (state.layoutByWorkspace[persistenceKey] ?? null) : null,
   );
   const hasHydratedWorkspaceLayoutStore = useWorkspaceLayoutStoreHydrated();
+  const defaultWorkspaceLayout = useMemo(() => createDefaultLayout(), []);
+  // The desktop split container owns the tab row. Once persistence has hydrated,
+  // render a default layout even before the first workspace action stores one.
+  const renderWorkspaceLayout = useMemo(
+    () =>
+      hasHydratedWorkspaceLayoutStore
+        ? (workspaceLayout ?? defaultWorkspaceLayout)
+        : workspaceLayout,
+    [defaultWorkspaceLayout, hasHydratedWorkspaceLayoutStore, workspaceLayout],
+  );
   const workspaceSetupSnapshot = useWorkspaceSetupStore((state) =>
     persistenceKey ? (state.snapshots[persistenceKey] ?? null) : null,
   );
   const upsertWorkspaceSetupProgress = useWorkspaceSetupStore((state) => state.upsertProgress);
   const showWorkspaceSetup = shouldShowWorkspaceSetup(workspaceSetupSnapshot);
   const uiTabs = useMemo(
-    () => (workspaceLayout ? collectAllTabs(workspaceLayout.root) : EMPTY_UI_TABS),
-    [workspaceLayout],
+    () => (renderWorkspaceLayout ? collectAllTabs(renderWorkspaceLayout.root) : EMPTY_UI_TABS),
+    [renderWorkspaceLayout],
   );
   useSyncWorkspaceActiveBrowser({ workspaceLayout, isRouteFocused });
   const openWorkspaceTabInBackground = useWorkspaceLayoutStore(
@@ -1740,10 +1751,10 @@ function WorkspaceScreenContent({
   const focusedPaneTabState = useMemo(
     () =>
       deriveWorkspacePaneState({
-        layout: workspaceLayout,
+        layout: renderWorkspaceLayout,
         tabs: uiTabs,
       }),
-    [uiTabs, workspaceLayout],
+    [renderWorkspaceLayout, uiTabs],
   );
   const setFocusedAgentId = useSessionStore((state) => state.setFocusedAgentId);
   const focusedPaneAgentId = useMemo(() => {
@@ -3094,12 +3105,12 @@ function WorkspaceScreenContent({
     [isFocusModeEnabled, isMobile],
   );
   const desktopContent = useMemo(() => {
-    if (!canRenderDesktopPaneSplits || !workspaceLayout || !persistenceKey) {
+    if (!canRenderDesktopPaneSplits || !renderWorkspaceLayout || !persistenceKey) {
       return content;
     }
     return (
       <SplitContainer
-        layout={workspaceLayout}
+        layout={renderWorkspaceLayout}
         focusModeEnabled={desktopFocusModeEnabled}
         workspaceKey={persistenceKey}
         normalizedServerId={normalizedServerId}
@@ -3135,7 +3146,7 @@ function WorkspaceScreenContent({
   }, [
     content,
     canRenderDesktopPaneSplits,
-    workspaceLayout,
+    renderWorkspaceLayout,
     persistenceKey,
     desktopFocusModeEnabled,
     normalizedServerId,
