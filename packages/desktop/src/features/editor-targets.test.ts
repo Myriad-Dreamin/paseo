@@ -418,11 +418,43 @@ describe("desktop editor targets", () => {
     expect(recorder.calls[0]?.args).toEqual(["/tmp/repo", "/tmp/repo/src/index.ts"]);
   });
 
+  it("opens code-family editor targets at a line and column", async () => {
+    const recorder = createSpawnRecorder();
+
+    await openEditorTarget(
+      {
+        editorId: "vscode",
+        path: "/tmp/repo/src/index.ts",
+        cwd: "/tmp/repo",
+        lineStart: 12,
+        columnStart: 4,
+      },
+      {
+        platform: "darwin",
+        env: { PATH: "/usr/local/bin" },
+        existsSync: createExistsSync([
+          "/tmp/repo/src/index.ts",
+          "/tmp/repo",
+          "/usr/local/bin/code",
+        ]),
+        spawn: recorder.spawn,
+      },
+    );
+
+    expect(recorder.calls[0]?.args).toEqual(["--goto", "/tmp/repo/src/index.ts:12:4", "/tmp/repo"]);
+  });
+
   it("can launch future custom script targets by string id", async () => {
     const recorder = createSpawnRecorder();
 
     await openEditorTarget(
-      { editorId: "script:open-in-nvim", path: "/tmp/repo/src/index.ts", cwd: "/tmp/repo" },
+      {
+        editorId: "script:open-in-nvim",
+        path: "/tmp/repo/src/index.ts",
+        cwd: "/tmp/repo",
+        lineStart: 12,
+        columnStart: 4,
+      },
       {
         platform: "linux",
         env: { PATH: "/usr/local/bin" },

@@ -13,11 +13,12 @@ export interface InlinePathTarget {
   path: string;
   lineStart?: number;
   lineEnd?: number;
+  columnStart?: number;
 }
 
 const FILE_PROTOCOL = "file:";
 const INLINE_LINE_FRAGMENT = /^L([0-9]+)(?:C[0-9]+)?(?:-L?([0-9]+)(?:C[0-9]+)?)?$/i;
-const INLINE_COLON_LINE_SUFFIX = /^(.+?):([0-9]+)(?::[0-9]+)?(?:-([0-9]+)(?::[0-9]+)?)?$/;
+const INLINE_COLON_LINE_SUFFIX = /^(.+?):([0-9]+)(?:(?::([0-9]+))|-([0-9]+))?$/;
 const INLINE_PAREN_LINE_SUFFIX = /^(.+?)\(([0-9]+)(?:,[0-9]+)?(?:-([0-9]+)(?:,[0-9]+)?)?\)$/;
 const INLINE_WORD_LINE_SUFFIX = /^(.+?)\s+lines?\s+([0-9]+)(?:-([0-9]+))?$/i;
 const ASSISTANT_FILE_EXTENSIONS = new Set([
@@ -101,6 +102,10 @@ export interface NormalizedInlinePathTarget {
   file?: string;
 }
 
+type InlinePathLocation = Pick<InlinePathTarget, "path" | "lineStart" | "lineEnd" | "columnStart">;
+
+type InlineLineLocation = Pick<InlinePathTarget, "lineStart" | "lineEnd" | "columnStart">;
+
 function normalizePathToken(value: string): string | null {
   const trimmed = value
     .trim()
@@ -135,11 +140,92 @@ function parseLineFragment(value: string): Pick<InlinePathTarget, "lineStart" | 
   return { lineStart, lineEnd };
 }
 
+function parsePositiveIntegerToken(value: string | undefined): number | null {
+  const parsed = parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseInlineLineLocation(input: {
+  lineStartRaw: string | undefined;
+  lineEndRaw?: string;
+  columnStartRaw?: string;
+}): InlineLineLocation | null {
+  const lineStart = parsePositiveIntegerToken(input.lineStartRaw);
+  if (!lineStart) {
+    return null;
+  }
+
+  let lineEnd: number | undefined;
+  if (input.lineEndRaw) {
+    const parsedLineEnd = parsePositiveIntegerToken(input.lineEndRaw);
+    if (!parsedLineEnd || parsedLineEnd < lineStart) {
+      return null;
+    }
+    lineEnd = parsedLineEnd;
+  }
+
+  let columnStart: number | undefined;
+  if (input.columnStartRaw) {
+    const parsedColumnStart = parsePositiveIntegerToken(input.columnStartRaw);
+    if (!parsedColumnStart) {
+      return null;
+    }
+    columnStart = parsedColumnStart;
+  }
+
+  return {
+    lineStart,
+    lineEnd,
+    ...(columnStart ? { columnStart } : {}),
+  };
+}
+
+function parseColonLineLocation(value: string): InlinePathLocation | null {
+  const match = value.match(INLINE_COLON_LINE_SUFFIX);
+  if (!match) {
+    return null;
+  }
+
+  const path = normalizePathToken(match[1] ?? "");
+  if (!path) {
+    return null;
+  }
+
+  const lines = parseInlineLineLocation({
+    lineStartRaw: match[2],
+    columnStartRaw: match[3],
+    lineEndRaw: match[4],
+  });
+  if (!lines) {
+    return null;
+  }
+
+  return {
+    path,
+    ...lines,
+  };
+}
+
+function parsePathLocation(pathValue: string, hash = ""): InlinePathLocation | null {
+  const path = normalizePathToken(pathValue);
+  if (!path) {
+    return null;
+  }
+
+  if (hash) {
+    const fragmentLines = parseLineFragment(hash);
+    return fragmentLines ? { path, ...fragmentLines } : null;
+  }
+
+  return parseColonLineLocation(path) ?? { path, lineStart: undefined, lineEnd: undefined };
+}
+
 /**
  * Strict VSCode-style markers only.
  *
  * Supported:
  * - `filename:linenumber`
+ * - `filename:linenumber:columnnumber`
  * - `filename:lineStart-lineEnd`
  *
  * Not supported (by design):
@@ -153,10 +239,20 @@ export function parseInlinePathToken(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const match =
-    trimmed.match(INLINE_COLON_LINE_SUFFIX) ??
-    trimmed.match(INLINE_PAREN_LINE_SUFFIX) ??
-    trimmed.match(INLINE_WORD_LINE_SUFFIX);
+  // Avoid accidentally treating URLs as file paths.
+  if (trimmed.includes("://")) {
+    return null;
+  }
+
+  const location = parseColonLineLocation(trimmed);
+  if (location) {
+    return {
+      raw: rawValue,
+      ...location,
+    };
+  }
+
+  const match = trimmed.match(INLINE_PAREN_LINE_SUFFIX) ?? trimmed.match(INLINE_WORD_LINE_SUFFIX);
   if (!match) {
     return null;
   }
@@ -166,36 +262,23 @@ export function parseInlinePathToken(value: string): InlinePathTarget | null {
     return null;
   }
 
-  // Avoid accidentally treating URLs as file paths.
-  if (basePathRaw.includes("://")) {
-    return null;
-  }
-
   const normalizedPath = normalizePathToken(basePathRaw);
   if (!normalizedPath) {
     return null;
   }
 
-  const lineStart = parseInt(match[2], 10);
-  if (!Number.isFinite(lineStart) || lineStart <= 0) {
+  const lines = parseInlineLineLocation({
+    lineStartRaw: match[2],
+    lineEndRaw: match[3],
+  });
+  if (!lines) {
     return null;
-  }
-
-  const lineEnd = match[3] ? parseInt(match[3], 10) : undefined;
-  if (lineEnd !== undefined) {
-    if (!Number.isFinite(lineEnd) || lineEnd <= 0) {
-      return null;
-    }
-    if (lineEnd < lineStart) {
-      return null;
-    }
   }
 
   return {
     raw: rawValue,
     path: normalizedPath,
-    lineStart,
-    lineEnd,
+    ...lines,
   };
 }
 
@@ -221,15 +304,14 @@ export function parseFileProtocolUrl(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const lines = parseLineFragment(parsedUrl.hash);
-  if (!lines) {
+  const location = parsePathLocation(normalizedPath, parsedUrl.hash);
+  if (!location) {
     return null;
   }
 
   return {
     raw: value,
-    path: normalizedPath,
-    ...lines,
+    ...location,
   };
 }
 
@@ -247,6 +329,91 @@ function parseAssistantInlinePathLink(value: string): InlinePathTarget | null {
   return {
     ...inlinePathTarget,
     path: normalizedPath,
+  };
+}
+
+function buildInlinePathTarget(raw: string, pathValue: string, hash = ""): InlinePathTarget | null {
+  const location = parsePathLocation(pathValue, hash);
+  return location ? { raw, ...location } : null;
+}
+
+function resolveRelativeInlinePathTarget(
+  raw: string,
+  location: InlinePathLocation,
+  options: AssistantHrefParseOptions,
+  allowUnrooted: boolean,
+): InlinePathTarget | null {
+  if (isAbsolutePath(location.path) || !isPlausibleAssistantLocalPath(location.path)) {
+    return null;
+  }
+
+  if (isHomeRelativePath(location.path)) {
+    return {
+      raw,
+      ...location,
+    };
+  }
+
+  const workspaceRoot = normalizePathInput(options.workspaceRoot);
+  if (!workspaceRoot) {
+    return allowUnrooted ? { raw, ...location } : null;
+  }
+
+  const path = resolveRelativePathUnderRoot(location.path, workspaceRoot);
+  if (!path) {
+    return null;
+  }
+
+  return {
+    raw,
+    ...location,
+    path,
+  };
+}
+
+function parseWindowsAssistantFileLink(raw: string, trimmed: string): InlinePathTarget | null {
+  const windowsPathMatch = trimmed.match(/^([A-Za-z]:[\\/][^?#]*)(#[^?]+)?$/);
+  if (!windowsPathMatch) {
+    return null;
+  }
+
+  return buildInlinePathTarget(raw, windowsPathMatch[1] ?? "", windowsPathMatch[2] ?? "");
+}
+
+function parseRelativeLocationAssistantFileLink(
+  raw: string,
+  trimmed: string,
+  options: AssistantHrefParseOptions,
+): InlinePathTarget | null {
+  const location = parseColonLineLocation(trimmed);
+  if (!location) {
+    return null;
+  }
+
+  return resolveRelativeInlinePathTarget(raw, location, options, true);
+}
+
+function parseAbsoluteAssistantFileLink(raw: string, trimmed: string): InlinePathTarget | null {
+  if (!isAbsolutePath(trimmed)) {
+    return null;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(trimmed, "http://paseo.invalid");
+  } catch {
+    return null;
+  }
+
+  const normalizedPath = normalizePathToken(safeDecodeURIComponent(parsedUrl.pathname));
+  const location = normalizedPath ? parsePathLocation(normalizedPath, parsedUrl.hash) : null;
+  if (!location || !isAbsolutePath(location.path)) {
+    return null;
+  }
+
+  return {
+    raw,
+    ...location,
   };
 }
 
@@ -312,23 +479,14 @@ export function parseAssistantFileLink(
     return inlinePathTarget;
   }
 
-  const windowsPathMatch = trimmed.match(/^([A-Za-z]:[\\/][^?#]*)(#[^?]+)?$/);
-  if (windowsPathMatch) {
-    const normalizedPath = normalizePathToken(windowsPathMatch[1] ?? "");
-    if (!normalizedPath) {
-      return null;
-    }
+  const windowsTarget = parseWindowsAssistantFileLink(value, trimmed);
+  if (windowsTarget) {
+    return windowsTarget;
+  }
 
-    const lines = parseLineFragment(windowsPathMatch[2] ?? "");
-    if (!lines) {
-      return null;
-    }
-
-    return {
-      raw: value,
-      path: normalizedPath,
-      ...lines,
-    };
+  const relativeLocationTarget = parseRelativeLocationAssistantFileLink(value, trimmed, options);
+  if (relativeLocationTarget) {
+    return relativeLocationTarget;
   }
 
   const relativeTarget = parseWorkspaceRelativeFileLink(trimmed, {
@@ -338,32 +496,7 @@ export function parseAssistantFileLink(
     return relativeTarget;
   }
 
-  if (!isAbsolutePath(trimmed)) {
-    return null;
-  }
-
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(trimmed, "http://paseo.invalid");
-  } catch {
-    return null;
-  }
-
-  const normalizedPath = normalizePathToken(safeDecodeURIComponent(parsedUrl.pathname));
-  if (!normalizedPath || !isAbsolutePath(normalizedPath)) {
-    return null;
-  }
-
-  const lines = parseLineFragment(parsedUrl.hash);
-  if (!lines) {
-    return null;
-  }
-
-  return {
-    raw: value,
-    path: normalizedPath,
-    ...lines,
-  };
+  return parseAbsoluteAssistantFileLink(value, trimmed);
 }
 
 export function isFileLookingAssistantToken(value: string): boolean {
@@ -390,38 +523,21 @@ function parseWorkspaceRelativeFileLink(
   options: AssistantHrefParseOptions,
 ): InlinePathTarget | null {
   const parsed = parseLocalPathParts(value);
-  if (!parsed || isAbsolutePath(parsed.path)) {
+  if (!parsed) {
     return null;
   }
 
-  if (isHomeRelativePath(parsed.path)) {
-    return {
-      raw: value,
-      path: parsed.path,
-      ...parsed.lines,
-    };
-  }
-
-  const workspaceRoot = normalizePathInput(options.workspaceRoot);
-  if (!workspaceRoot) {
-    return null;
-  }
-
-  const normalizedPath = resolveRelativePathUnderRoot(parsed.path, workspaceRoot);
-  if (!normalizedPath) {
-    return null;
-  }
-
-  return {
-    raw: value,
-    path: normalizedPath,
-    ...parsed.lines,
-  };
+  return resolveRelativeInlinePathTarget(
+    value,
+    { path: parsed.path, ...parsed.lines },
+    options,
+    false,
+  );
 }
 
 function parseLocalPathParts(
   value: string,
-): { path: string; lines: Pick<InlinePathTarget, "lineStart" | "lineEnd"> } | null {
+): { path: string; lines: Pick<InlinePathTarget, "lineStart" | "lineEnd" | "columnStart"> } | null {
   const normalized = normalizePathToken(value);
   if (!normalized || normalized.includes("?")) {
     return null;
@@ -446,6 +562,7 @@ function parseLocalPathParts(
       lines: {
         lineStart: inlinePathTarget.lineStart,
         lineEnd: inlinePathTarget.lineEnd,
+        columnStart: inlinePathTarget.columnStart,
       },
     };
   }

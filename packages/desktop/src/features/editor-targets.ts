@@ -7,12 +7,14 @@ import { z } from "zod";
 
 type EditorTargetKind = "editor" | "file-manager";
 type OpenEditorMode = "open" | "reveal";
+type EditorLocationMode = "code-goto";
 
 interface EditorTargetDefinition {
   id: string;
   label: string;
   kind: EditorTargetKind;
   command: string;
+  locationMode?: EditorLocationMode;
   platforms?: readonly NodeJS.Platform[];
   excludedPlatforms?: readonly NodeJS.Platform[];
 }
@@ -28,6 +30,8 @@ export interface OpenEditorTargetInput {
   path: string;
   cwd?: string;
   mode?: OpenEditorMode;
+  lineStart?: number;
+  columnStart?: number;
 }
 
 interface ListEditorTargetsDependencies {
@@ -69,11 +73,17 @@ const RUNTIME_CONTROL_ENV_KEYS = [
 ] as const;
 
 const BUILT_IN_EDITOR_TARGETS: readonly EditorTargetDefinition[] = [
-  { id: "cursor", label: "Cursor", kind: "editor", command: "cursor" },
-  { id: "vscode", label: "VS Code", kind: "editor", command: "code" },
+  { id: "cursor", label: "Cursor", kind: "editor", command: "cursor", locationMode: "code-goto" },
+  { id: "vscode", label: "VS Code", kind: "editor", command: "code", locationMode: "code-goto" },
   { id: "webstorm", label: "WebStorm", kind: "editor", command: "webstorm" },
   { id: "zed", label: "Zed", kind: "editor", command: "zed" },
-  { id: "antigravity", label: "Antigravity", kind: "editor", command: "antigravity" },
+  {
+    id: "antigravity",
+    label: "Antigravity",
+    kind: "editor",
+    command: "antigravity",
+    locationMode: "code-goto",
+  },
   {
     id: "finder",
     label: "Finder",
@@ -102,6 +112,8 @@ const OpenEditorTargetInputSchema = z.object({
   path: z.string().trim().min(1),
   cwd: z.string().trim().min(1).optional(),
   mode: z.enum(["open", "reveal"]).optional(),
+  lineStart: z.number().int().positive().optional(),
+  columnStart: z.number().int().positive().optional(),
 });
 
 function isTargetSupportedOnPlatform(
@@ -240,6 +252,8 @@ function buildLaunch(input: {
   path: string;
   cwd?: string;
   mode: OpenEditorMode;
+  lineStart?: number;
+  columnStart?: number;
   platform: NodeJS.Platform;
   executable: string;
 }): Launch {
@@ -255,13 +269,41 @@ function buildLaunch(input: {
     }
   }
 
-  if (input.target.kind === "editor" && input.cwd && input.cwd !== input.path) {
-    return { command: input.executable, args: [input.cwd, input.path] };
+  if (input.target.kind === "editor") {
+    const editorPathArg = buildEditorPathArgument(input);
+    if (input.target.locationMode === "code-goto" && input.lineStart) {
+      const args = ["--goto", editorPathArg];
+      if (input.cwd && input.cwd !== input.path) {
+        args.push(input.cwd);
+      }
+      return { command: input.executable, args };
+    }
+    if (input.cwd && input.cwd !== input.path) {
+      return { command: input.executable, args: [input.cwd, editorPathArg] };
+    }
+    return { command: input.executable, args: [editorPathArg] };
   }
   if (input.target.id === "explorer" && input.platform === "win32") {
     return { command: input.executable, args: [toWindowsPathSeparators(input.path)] };
   }
   return { command: input.executable, args: [input.path] };
+}
+
+function buildEditorPathArgument(input: {
+  target: EditorTargetDefinition;
+  path: string;
+  lineStart?: number;
+  columnStart?: number;
+}): string {
+  if (input.target.locationMode !== "code-goto" || !input.lineStart) {
+    return input.path;
+  }
+
+  let result = `${input.path}:${input.lineStart}`;
+  if (input.columnStart) {
+    result += `:${input.columnStart}`;
+  }
+  return result;
 }
 
 function spawnDetachedProcess(
@@ -327,6 +369,8 @@ export async function openEditorTarget(
     path: pathToOpen,
     cwd: workspaceCwd,
     mode: parsedInput.mode ?? "open",
+    lineStart: parsedInput.lineStart,
+    columnStart: parsedInput.columnStart,
     platform,
     executable,
   });

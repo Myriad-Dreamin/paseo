@@ -58,6 +58,7 @@ function resolveActiveFileForOpenTargets(
 
 function planDesktopOpenTargets(input: {
   workspaceDirectory: string;
+  activeFile?: WorkspaceFileLocation | null;
   resolvedFile: ResolvedWorkspaceFilePaths | null;
   desktopTargets: readonly DesktopOpenTarget[];
   canUseDesktopBridge: boolean;
@@ -78,6 +79,8 @@ function planDesktopOpenTargets(input: {
       };
     }
     if (target.kind === "editor") {
+      const lineStart = input.activeFile?.lineStart;
+      const columnStart = input.activeFile?.columnStart;
       return {
         source: "desktop",
         id: target.id,
@@ -87,6 +90,8 @@ function planDesktopOpenTargets(input: {
           editorId: target.id,
           path: input.resolvedFile.absolutePath,
           cwd: input.workspaceDirectory,
+          ...(lineStart ? { lineStart } : {}),
+          ...(lineStart && columnStart ? { columnStart } : {}),
         },
       };
     }

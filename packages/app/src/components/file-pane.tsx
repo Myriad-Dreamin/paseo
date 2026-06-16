@@ -46,6 +46,9 @@ interface FilePreviewBodyProps {
   imagePreviewUri: string | null;
 }
 
+const CODE_LINE_HEIGHT_MULTIPLIER = 1.45;
+const TARGET_LINE_CONTEXT_LINES = 3;
+
 function trimNonEmpty(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
     return null;
@@ -130,6 +133,10 @@ const CodeLine = React.memo(function CodeLine({
     () => [codeLineStyles.line, highlighted && codeLineStyles.highlightedLine],
     [highlighted],
   );
+  const gutterTextStyle = useMemo(
+    () => [codeLineStyles.gutterText, highlighted && codeLineStyles.highlightedGutterText],
+    [highlighted],
+  );
   const keyedTokens = useMemo(
     () => tokens.map((token, index) => ({ key: `${index}-${token.text}`, token })),
     [tokens],
@@ -137,7 +144,7 @@ const CodeLine = React.memo(function CodeLine({
   return (
     <View style={lineStyle}>
       <View style={gutterStyle}>
-        <Text numberOfLines={1} style={codeLineStyles.gutterText}>
+        <Text numberOfLines={1} style={gutterTextStyle}>
           {String(lineNumber)}
         </Text>
       </View>
@@ -161,9 +168,12 @@ function CodeLineToken({ token }: CodeLineTokenProps) {
 const codeLineStyles = StyleSheet.create((theme) => ({
   line: {
     flexDirection: "row",
+    borderLeftWidth: 2,
+    borderLeftColor: "transparent",
   },
   highlightedLine: {
     backgroundColor: theme.colors.accentBorder,
+    borderLeftColor: theme.colors.primary,
   },
   gutter: {
     alignItems: "flex-end",
@@ -174,14 +184,18 @@ const codeLineStyles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
-    lineHeight: theme.fontSize.code * 1.45,
+    lineHeight: theme.fontSize.code * CODE_LINE_HEIGHT_MULTIPLIER,
     opacity: 0.4,
     userSelect: "none",
+  },
+  highlightedGutterText: {
+    color: theme.colors.primary,
+    opacity: 1,
   },
   lineText: {
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
-    lineHeight: theme.fontSize.code * 1.45,
+    lineHeight: theme.fontSize.code * CODE_LINE_HEIGHT_MULTIPLIER,
     flex: 1,
   },
 }));
@@ -218,7 +232,8 @@ function FilePreviewBody({
     if (!highlightedLines) return 0;
     return lineNumberGutterWidth(highlightedLines.length, theme.fontSize.code);
   }, [highlightedLines, theme.fontSize.code]);
-  const lineHeight = theme.fontSize.code * 1.45;
+  const lineHeight = theme.fontSize.code * CODE_LINE_HEIGHT_MULTIPLIER;
+  const previewPadding = theme.spacing[4];
   const lineSelection = useMemo(() => {
     if (!highlightedLines) {
       return null;
@@ -241,12 +256,15 @@ function FilePreviewBody({
     }
     const timeout = setTimeout(() => {
       previewScrollRef.current?.scrollTo({
-        y: Math.max(0, (lineSelection.lineStart - 1) * lineHeight),
+        y: Math.max(
+          0,
+          previewPadding + (lineSelection.lineStart - 1 - TARGET_LINE_CONTEXT_LINES) * lineHeight,
+        ),
         animated: false,
       });
     }, 0);
     return () => clearTimeout(timeout);
-  }, [lineHeight, lineSelection]);
+  }, [lineHeight, lineSelection, previewPadding]);
 
   if (isLoading && !preview) {
     return (

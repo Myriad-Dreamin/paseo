@@ -6,6 +6,7 @@ export interface WorkspaceFileLocation {
   path: string;
   lineStart?: number;
   lineEnd?: number;
+  columnStart?: number;
 }
 
 export type WorkspaceFileTabTarget = { kind: "file" } & WorkspaceFileLocation;
@@ -29,10 +30,12 @@ export function normalizeWorkspaceFileLocation(
 
   const lineStart = normalizeLineNumber(location.lineStart);
   const lineEnd = normalizeLineNumber(location.lineEnd);
+  const columnStart = normalizeLineNumber(location.columnStart);
   return {
     path,
     ...(lineStart ? { lineStart } : {}),
     ...(lineStart && lineEnd && lineEnd >= lineStart ? { lineEnd } : {}),
+    ...(lineStart && columnStart ? { columnStart } : {}),
   };
 }
 
@@ -41,7 +44,10 @@ export function workspaceFileLocationsEqual(
   right: WorkspaceFileLocation,
 ): boolean {
   return (
-    left.path === right.path && left.lineStart === right.lineStart && left.lineEnd === right.lineEnd
+    left.path === right.path &&
+    left.lineStart === right.lineStart &&
+    left.lineEnd === right.lineEnd &&
+    left.columnStart === right.columnStart
   );
 }
 
