@@ -116,31 +116,9 @@ function isCleanLegacyPathDecode(value: string): boolean {
 export type WorkspaceOpenIntent =
   | { kind: "agent"; agentId: string }
   | { kind: "terminal"; terminalId: string }
-  | { kind: "file"; path: string; lineStart?: number; columnStart?: number }
+  | { kind: "file"; path: string }
   | { kind: "draft"; draftId: string }
   | { kind: "setup"; workspaceId: string };
-
-function parseFileOpenIntentPayload(
-  payload: string,
-): Extract<WorkspaceOpenIntent, { kind: "file" }> | null {
-  const match = payload.match(/^([^:]+)(?::([1-9][0-9]*)(?::([1-9][0-9]*))?)?$/);
-  if (!match) {
-    return null;
-  }
-  const decodedPath = decodeFilePathFromPathSegment(match[1] ?? "");
-  if (!decodedPath) {
-    return null;
-  }
-
-  const lineStart = match[2] ? Number.parseInt(match[2], 10) : undefined;
-  const columnStart = match[3] ? Number.parseInt(match[3], 10) : undefined;
-  return {
-    kind: "file",
-    path: decodedPath,
-    ...(lineStart ? { lineStart } : {}),
-    ...(columnStart ? { columnStart } : {}),
-  };
-}
 
 export function parseWorkspaceOpenIntent(
   value: string | null | undefined,
@@ -171,7 +149,11 @@ export function parseWorkspaceOpenIntent(
     return { kind: "draft", draftId: payload };
   }
   if (kind === "file") {
-    return parseFileOpenIntentPayload(payload);
+    const decodedPath = decodeFilePathFromPathSegment(payload);
+    if (!decodedPath) {
+      return null;
+    }
+    return { kind: "file", path: decodedPath };
   }
   if (kind === "setup") {
     const workspaceId = decodeWorkspaceIdFromPathSegment(payload);

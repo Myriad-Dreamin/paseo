@@ -520,7 +520,6 @@ function coerceWorkspaceTabTarget(raw: Record<string, unknown>): WorkspaceTabTar
       path: raw.path,
       lineStart: typeof raw.lineStart === "number" ? raw.lineStart : undefined,
       lineEnd: typeof raw.lineEnd === "number" ? raw.lineEnd : undefined,
-      columnStart: typeof raw.columnStart === "number" ? raw.columnStart : undefined,
     });
   }
   if (kind === "setup" && typeof raw.workspaceId === "string") {

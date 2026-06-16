@@ -367,7 +367,6 @@ describe("workspace-layout-store actions", () => {
       path: "/repo/worktree/a.ts",
       lineStart: 10,
       lineEnd: 12,
-      columnStart: 7,
     });
     const layout = workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
 
@@ -381,7 +380,6 @@ describe("workspace-layout-store actions", () => {
           path: "/repo/worktree/a.ts",
           lineStart: 10,
           lineEnd: 12,
-          columnStart: 7,
         },
         createdAt: expect.any(Number),
       },

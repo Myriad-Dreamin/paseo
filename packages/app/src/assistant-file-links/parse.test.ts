@@ -31,13 +31,12 @@ describe("parseInlinePathToken", () => {
     });
   });
 
-  it("parses filename:line:column", () => {
-    expect(parseInlinePathToken("src/app.ts:12:5")).toEqual({
-      raw: "src/app.ts:12:5",
+  it("parses filename:line:column as a line target", () => {
+    expect(parseInlinePathToken("src/app.ts:12:4")).toEqual({
+      raw: "src/app.ts:12:4",
       path: "src/app.ts",
       lineStart: 12,
       lineEnd: undefined,
-      columnStart: 5,
     });
   });
 
@@ -295,34 +294,6 @@ describe("parseAssistantFileLink", () => {
       path: "/Users/test/project/src/app.tsx",
       lineStart: 33,
       lineEnd: undefined,
-    });
-  });
-
-  it("parses absolute POSIX hrefs with trailing line suffixes inside the active workspace", () => {
-    expect(
-      parseAssistantFileLink("/Users/test/project/src/app.tsx:33:2", {
-        workspaceRoot: "/Users/test/project",
-      }),
-    ).toEqual({
-      raw: "/Users/test/project/src/app.tsx:33:2",
-      path: "/Users/test/project/src/app.tsx",
-      lineStart: 33,
-      lineEnd: undefined,
-      columnStart: 2,
-    });
-  });
-
-  it("resolves relative hrefs with trailing line suffixes against the active workspace", () => {
-    expect(
-      parseAssistantFileLink("src/app.tsx:33:2", {
-        workspaceRoot: "/Users/test/project",
-      }),
-    ).toEqual({
-      raw: "src/app.tsx:33:2",
-      path: "/Users/test/project/src/app.tsx",
-      lineStart: 33,
-      lineEnd: undefined,
-      columnStart: 2,
     });
   });
 

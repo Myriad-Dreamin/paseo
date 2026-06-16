@@ -148,7 +148,7 @@ export function AssistantMarkdownCodeLink({
 }
 
 function formatInlinePathTargetForTooltip(
-  target: { path: string; lineStart?: number; lineEnd?: number; columnStart?: number },
+  target: { path: string; lineStart?: number; lineEnd?: number },
   workspaceRoot: string | undefined,
 ): string {
   let result = relativizePathToWorkspace(target.path, workspaceRoot);
@@ -156,8 +156,6 @@ function formatInlinePathTargetForTooltip(
     result += `:${target.lineStart}`;
     if (target.lineEnd && target.lineEnd !== target.lineStart) {
       result += `-${target.lineEnd}`;
-    } else if (target.columnStart) {
-      result += `:${target.columnStart}`;
     }
   }
   return result;

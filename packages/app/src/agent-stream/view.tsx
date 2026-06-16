@@ -316,7 +316,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             path: normalized.file,
             lineStart: target.lineStart,
             lineEnd: target.lineEnd,
-            columnStart: target.columnStart,
           });
           if (!location) {
             return;

@@ -13,16 +13,13 @@ export interface InlinePathTarget {
   path: string;
   lineStart?: number;
   lineEnd?: number;
-  columnStart?: number;
 }
 
 const FILE_PROTOCOL = "file:";
 const INLINE_LINE_FRAGMENT = /^L([0-9]+)(?:C[0-9]+)?(?:-L?([0-9]+)(?:C[0-9]+)?)?$/i;
-const INLINE_COLON_LINE_SUFFIX =
-  /^(.+?):([1-9][0-9]*)(?::([1-9][0-9]*))?(?:-([1-9][0-9]*)(?::[1-9][0-9]*)?)?$/;
-const INLINE_PAREN_LINE_SUFFIX =
-  /^(.+?)\(([1-9][0-9]*)(?:,[0-9]+)?(?:-([1-9][0-9]*)(?:,[0-9]+)?)?\)$/;
-const INLINE_WORD_LINE_SUFFIX = /^(.+?)\s+lines?\s+([1-9][0-9]*)(?:-([1-9][0-9]*))?$/i;
+const INLINE_COLON_LINE_SUFFIX = /^(.+?):([0-9]+)(?::[0-9]+)?(?:-([0-9]+)(?::[0-9]+)?)?$/;
+const INLINE_PAREN_LINE_SUFFIX = /^(.+?)\(([0-9]+)(?:,[0-9]+)?(?:-([0-9]+)(?:,[0-9]+)?)?\)$/;
+const INLINE_WORD_LINE_SUFFIX = /^(.+?)\s+lines?\s+([0-9]+)(?:-([0-9]+))?$/i;
 const ASSISTANT_FILE_EXTENSIONS = new Set([
   "astro",
   "bash",
@@ -143,7 +140,7 @@ function parseLineFragment(value: string): Pick<InlinePathTarget, "lineStart" | 
  *
  * Supported:
  * - `filename:linenumber`
- * - `filename:linenumber:columnnumber`
+ * - `filename:linenumber:columnnumber` as a line target
  * - `filename:lineStart-lineEnd`
  *
  * Not supported (by design):
@@ -157,9 +154,10 @@ export function parseInlinePathToken(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const colonMatch = trimmed.match(INLINE_COLON_LINE_SUFFIX);
   const match =
-    colonMatch ?? trimmed.match(INLINE_PAREN_LINE_SUFFIX) ?? trimmed.match(INLINE_WORD_LINE_SUFFIX);
+    trimmed.match(INLINE_COLON_LINE_SUFFIX) ??
+    trimmed.match(INLINE_PAREN_LINE_SUFFIX) ??
+    trimmed.match(INLINE_WORD_LINE_SUFFIX);
   if (!match) {
     return null;
   }
@@ -179,22 +177,26 @@ export function parseInlinePathToken(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const lineStart = Number.parseInt(match[2] ?? "", 10);
-
-  const lineEndRaw = colonMatch ? colonMatch[4] : match[3];
-  const lineEnd = lineEndRaw ? Number.parseInt(lineEndRaw, 10) : undefined;
-  if (lineEnd !== undefined && lineEnd < lineStart) {
+  const lineStart = parseInt(match[2], 10);
+  if (!Number.isFinite(lineStart) || lineStart <= 0) {
     return null;
   }
 
-  const columnStart = colonMatch?.[3] ? Number.parseInt(colonMatch[3], 10) : undefined;
+  const lineEnd = match[3] ? parseInt(match[3], 10) : undefined;
+  if (lineEnd !== undefined) {
+    if (!Number.isFinite(lineEnd) || lineEnd <= 0) {
+      return null;
+    }
+    if (lineEnd < lineStart) {
+      return null;
+    }
+  }
 
   return {
     raw: rawValue,
     path: normalizedPath,
     lineStart,
     lineEnd,
-    ...(columnStart ? { columnStart } : {}),
   };
 }
 
@@ -420,7 +422,7 @@ function parseWorkspaceRelativeFileLink(
 
 function parseLocalPathParts(
   value: string,
-): { path: string; lines: Pick<InlinePathTarget, "lineStart" | "lineEnd" | "columnStart"> } | null {
+): { path: string; lines: Pick<InlinePathTarget, "lineStart" | "lineEnd"> } | null {
   const normalized = normalizePathToken(value);
   if (!normalized || normalized.includes("?")) {
     return null;
@@ -445,7 +447,6 @@ function parseLocalPathParts(
       lines: {
         lineStart: inlinePathTarget.lineStart,
         lineEnd: inlinePathTarget.lineEnd,
-        columnStart: inlinePathTarget.columnStart,
       },
     };
   }

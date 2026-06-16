@@ -13,13 +13,11 @@ describe("normalizeWorkspaceFileLocation", () => {
         path: "src\\app.ts",
         lineStart: 12.8,
         lineEnd: 20.2,
-        columnStart: 7.9,
       }),
     ).toEqual({
       path: "src/app.ts",
       lineStart: 12,
       lineEnd: 20,
-      columnStart: 7,
     });
   });
 
@@ -52,14 +50,14 @@ describe("workspace file tab targets", () => {
   it("compares full location equality", () => {
     expect(
       workspaceFileLocationsEqual(
-        { path: "src/app.ts", lineStart: 12, columnStart: 4 },
-        { path: "src/app.ts", lineStart: 12, columnStart: 4 },
+        { path: "src/app.ts", lineStart: 12 },
+        { path: "src/app.ts", lineStart: 12 },
       ),
     ).toBe(true);
     expect(
       workspaceFileLocationsEqual(
-        { path: "src/app.ts", lineStart: 12, columnStart: 4 },
-        { path: "src/app.ts", lineStart: 12, columnStart: 5 },
+        { path: "src/app.ts", lineStart: 12 },
+        { path: "src/app.ts", lineStart: 13 },
       ),
     ).toBe(false);
   });
