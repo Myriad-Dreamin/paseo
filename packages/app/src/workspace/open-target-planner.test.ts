@@ -16,7 +16,7 @@ describe("planWorkspaceOpenTargets", () => {
   it("plans editor targets with active-file absolute path and cwd", () => {
     const targets = planWorkspaceOpenTargets({
       workspaceDirectory: "/repo",
-      activeFile: { path: "src/app.ts", lineStart: 3, lineEnd: 5, columnStart: 2 },
+      activeFile: { path: "src/app.ts", lineStart: 3, lineEnd: 5 },
       desktopTargets,
       canUseDesktopBridge: true,
       isLocalExecution: true,
@@ -25,13 +25,7 @@ describe("planWorkspaceOpenTargets", () => {
     expect(targets[0]).toMatchObject({
       source: "desktop",
       id: "vscode",
-      openInput: {
-        editorId: "vscode",
-        path: "/repo/src/app.ts",
-        cwd: "/repo",
-        lineStart: 3,
-        columnStart: 2,
-      },
+      openInput: { editorId: "vscode", path: "/repo/src/app.ts", cwd: "/repo" },
     });
   });
 

@@ -62,8 +62,6 @@ export interface DesktopEditorOpenTargetInput {
   path: string;
   cwd?: string;
   mode?: "open" | "reveal";
-  lineStart?: number;
-  columnStart?: number;
 }
 
 export interface DesktopEditorBridge {
