@@ -120,18 +120,10 @@ export type WorkspaceOpenIntent =
   | { kind: "draft"; draftId: string }
   | { kind: "setup"; workspaceId: string };
 
-function parsePositiveInteger(value: string | undefined): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
 function parseFileOpenIntentPayload(
   payload: string,
 ): Extract<WorkspaceOpenIntent, { kind: "file" }> | null {
-  const match = payload.match(/^([^:]+)(?::([0-9]+)(?::([0-9]+))?)?$/);
+  const match = payload.match(/^([^:]+)(?::([1-9][0-9]*)(?::([1-9][0-9]*))?)?$/);
   if (!match) {
     return null;
   }
@@ -139,8 +131,9 @@ function parseFileOpenIntentPayload(
   if (!decodedPath) {
     return null;
   }
-  const lineStart = parsePositiveInteger(match[2]);
-  const columnStart = parsePositiveInteger(match[3]);
+
+  const lineStart = match[2] ? Number.parseInt(match[2], 10) : undefined;
+  const columnStart = match[3] ? Number.parseInt(match[3], 10) : undefined;
   return {
     kind: "file",
     path: decodedPath,

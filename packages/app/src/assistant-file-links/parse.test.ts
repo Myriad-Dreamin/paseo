@@ -93,25 +93,6 @@ describe("parseFileProtocolUrl", () => {
     });
   });
 
-  it("parses file URLs with trailing line suffixes", () => {
-    expect(parseFileProtocolUrl("file:///Users/test/project/src/app.tsx:81:4")).toEqual({
-      raw: "file:///Users/test/project/src/app.tsx:81:4",
-      path: "/Users/test/project/src/app.tsx",
-      lineStart: 81,
-      lineEnd: undefined,
-      columnStart: 4,
-    });
-  });
-
-  it("treats URL fragments as the location when both a fragment and path suffix exist", () => {
-    expect(parseFileProtocolUrl("file:///Users/test/project/src/app.tsx:81:4#L2")).toEqual({
-      raw: "file:///Users/test/project/src/app.tsx:81:4#L2",
-      path: "/Users/test/project/src/app.tsx:81:4",
-      lineStart: 2,
-      lineEnd: undefined,
-    });
-  });
-
   it("parses windows file URLs and line ranges", () => {
     expect(parseFileProtocolUrl("file:///C:/Users/test/project/src/app.tsx#L12-L20")).toEqual({
       raw: "file:///C:/Users/test/project/src/app.tsx#L12-L20",

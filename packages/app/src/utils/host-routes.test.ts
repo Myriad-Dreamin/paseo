@@ -110,6 +110,7 @@ describe("workspace route parsing", () => {
       lineStart: 12,
       columnStart: 4,
     });
+    expect(parseWorkspaceOpenIntent("file:c3JjL2luZGV4LnRz:0:4")).toBeNull();
     expect(parseWorkspaceOpenIntent("setup:L3RtcC9yZXBv")).toEqual({
       kind: "setup",
       workspaceId: "/tmp/repo",

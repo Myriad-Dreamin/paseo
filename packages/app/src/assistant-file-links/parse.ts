@@ -18,9 +18,11 @@ export interface InlinePathTarget {
 
 const FILE_PROTOCOL = "file:";
 const INLINE_LINE_FRAGMENT = /^L([0-9]+)(?:C[0-9]+)?(?:-L?([0-9]+)(?:C[0-9]+)?)?$/i;
-const INLINE_COLON_LINE_SUFFIX = /^(.+?):([0-9]+)(?::([0-9]+))?(?:-([0-9]+)(?::[0-9]+)?)?$/;
-const INLINE_PAREN_LINE_SUFFIX = /^(.+?)\(([0-9]+)(?:,[0-9]+)?(?:-([0-9]+)(?:,[0-9]+)?)?\)$/;
-const INLINE_WORD_LINE_SUFFIX = /^(.+?)\s+lines?\s+([0-9]+)(?:-([0-9]+))?$/i;
+const INLINE_COLON_LINE_SUFFIX =
+  /^(.+?):([1-9][0-9]*)(?::([1-9][0-9]*))?(?:-([1-9][0-9]*)(?::[1-9][0-9]*)?)?$/;
+const INLINE_PAREN_LINE_SUFFIX =
+  /^(.+?)\(([1-9][0-9]*)(?:,[0-9]+)?(?:-([1-9][0-9]*)(?:,[0-9]+)?)?\)$/;
+const INLINE_WORD_LINE_SUFFIX = /^(.+?)\s+lines?\s+([1-9][0-9]*)(?:-([1-9][0-9]*))?$/i;
 const ASSISTANT_FILE_EXTENSIONS = new Set([
   "astro",
   "bash",
@@ -136,15 +138,6 @@ function parseLineFragment(value: string): Pick<InlinePathTarget, "lineStart" | 
   return { lineStart, lineEnd };
 }
 
-function parseOptionalPositiveInteger(value: string | undefined): number | null | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
 /**
  * Strict VSCode-style markers only.
  *
@@ -186,21 +179,15 @@ export function parseInlinePathToken(value: string): InlinePathTarget | null {
     return null;
   }
 
-  const lineStart = parseOptionalPositiveInteger(match[2]);
-  if (!lineStart) {
-    return null;
-  }
+  const lineStart = Number.parseInt(match[2] ?? "", 10);
 
   const lineEndRaw = colonMatch ? colonMatch[4] : match[3];
-  const lineEnd = parseOptionalPositiveInteger(lineEndRaw);
-  if (lineEnd === null || (lineEnd !== undefined && lineEnd < lineStart)) {
+  const lineEnd = lineEndRaw ? Number.parseInt(lineEndRaw, 10) : undefined;
+  if (lineEnd !== undefined && lineEnd < lineStart) {
     return null;
   }
 
-  const columnStart = parseOptionalPositiveInteger(colonMatch?.[3]);
-  if (columnStart === null) {
-    return null;
-  }
+  const columnStart = colonMatch?.[3] ? Number.parseInt(colonMatch[3], 10) : undefined;
 
   return {
     raw: rawValue,
@@ -231,16 +218,6 @@ export function parseFileProtocolUrl(value: string): InlinePathTarget | null {
   const normalizedPath = normalizeFileUrlPath(parsedUrl.pathname);
   if (!normalizedPath) {
     return null;
-  }
-
-  if (!parsedUrl.hash) {
-    const inlinePathTarget = parseInlinePathToken(normalizedPath);
-    if (inlinePathTarget) {
-      return {
-        ...inlinePathTarget,
-        raw: value,
-      };
-    }
   }
 
   const lines = parseLineFragment(parsedUrl.hash);
