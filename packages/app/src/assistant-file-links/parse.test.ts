@@ -331,10 +331,14 @@ describe("parseAssistantFileLink", () => {
     });
   });
 
-  it("parses relative hrefs with trailing line suffixes", () => {
-    expect(parseAssistantFileLink("src/app.tsx:33:2")).toEqual({
+  it("resolves relative hrefs with trailing line suffixes against the active workspace", () => {
+    expect(
+      parseAssistantFileLink("src/app.tsx:33:2", {
+        workspaceRoot: "/Users/test/project",
+      }),
+    ).toEqual({
       raw: "src/app.tsx:33:2",
-      path: "src/app.tsx",
+      path: "/Users/test/project/src/app.tsx",
       lineStart: 33,
       lineEnd: undefined,
       columnStart: 2,
