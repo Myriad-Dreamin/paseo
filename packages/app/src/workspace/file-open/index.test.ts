@@ -21,6 +21,13 @@ describe("normalizeWorkspaceFileLocation", () => {
     });
   });
 
+  it("preserves and normalizes the source directory", () => {
+    expect(normalizeWorkspaceFileLocation({ directory: "C:\\repo\\src", path: "app.ts" })).toEqual({
+      directory: "C:/repo/src",
+      path: "app.ts",
+    });
+  });
+
   it("drops invalid or backwards line ranges", () => {
     expect(normalizeWorkspaceFileLocation({ path: "src/app.ts", lineStart: -1 })).toEqual({
       path: "src/app.ts",
@@ -58,6 +65,12 @@ describe("workspace file tab targets", () => {
       workspaceFileLocationsEqual(
         { path: "src/app.ts", lineStart: 12 },
         { path: "src/app.ts", lineStart: 13 },
+      ),
+    ).toBe(false);
+    expect(
+      workspaceFileLocationsEqual(
+        { directory: "src", path: "app.ts" },
+        { directory: "other", path: "app.ts" },
       ),
     ).toBe(false);
   });

@@ -71,7 +71,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
-  onCopyFilePath: (path: string) => Promise<void> | void;
+  onCopyFilePath: (input: { path: string; directory?: string }) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -88,7 +88,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
-  onCopyFilePath: (path: string) => Promise<void> | void;
+  onCopyFilePath: (input: { path: string; directory?: string }) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -224,7 +224,7 @@ export function buildWorkspaceTabMenuEntries(
   }
 
   if (tab.target.kind === "file") {
-    const filePath = tab.target.path;
+    const { directory, path } = tab.target;
     entries.push({
       kind: "item",
       key: "copy-file-path",
@@ -232,7 +232,7 @@ export function buildWorkspaceTabMenuEntries(
       icon: "copy",
       testID: `${menuTestIDBase}-copy-file-path`,
       onSelect: () => {
-        void onCopyFilePath(filePath);
+        void onCopyFilePath({ directory, path });
       },
     });
   }
