@@ -272,7 +272,7 @@ describe("buildWorkspaceTabMenuEntries", () => {
       throw new Error("Copy file path entry missing");
     }
     copyFilePathEntry.onSelect();
-    expect(onCopyFilePath).toHaveBeenCalledWith("/some/path.ts");
+    expect(onCopyFilePath).toHaveBeenCalledWith({ path: "/some/path.ts" });
 
     const renameEntry = entries.find((entry) => entry.kind === "item" && entry.key === "rename");
     if (!renameEntry || renameEntry.kind !== "item") {

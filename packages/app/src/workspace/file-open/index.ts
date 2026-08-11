@@ -3,6 +3,7 @@ import { isAbsolutePath } from "@/utils/path";
 export type OpenFileDisposition = "main" | "side";
 
 export interface WorkspaceFileLocation {
+  directory?: string;
   path: string;
   lineStart?: number;
   lineEnd?: number;
@@ -26,10 +27,12 @@ export function normalizeWorkspaceFileLocation(
   if (!path) {
     return null;
   }
+  const directory = normalizeDirectory(location.directory);
 
   const lineStart = normalizeLineNumber(location.lineStart);
   const lineEnd = normalizeLineNumber(location.lineEnd);
   return {
+    ...(directory ? { directory } : {}),
     path,
     ...(lineStart ? { lineStart } : {}),
     ...(lineStart && lineEnd && lineEnd >= lineStart ? { lineEnd } : {}),
@@ -41,8 +44,16 @@ export function workspaceFileLocationsEqual(
   right: WorkspaceFileLocation,
 ): boolean {
   return (
-    left.path === right.path && left.lineStart === right.lineStart && left.lineEnd === right.lineEnd
+    (left.directory ?? null) === (right.directory ?? null) &&
+    left.path === right.path &&
+    left.lineStart === right.lineStart &&
+    left.lineEnd === right.lineEnd
   );
+}
+
+function normalizeDirectory(value: string | null | undefined): string | undefined {
+  const directory = value?.trim().replace(/\\/g, "/");
+  return directory ? directory : undefined;
 }
 
 export function createWorkspaceFileTabTarget(

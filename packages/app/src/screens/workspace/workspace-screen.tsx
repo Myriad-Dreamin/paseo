@@ -135,6 +135,7 @@ import {
 } from "@/screens/workspace/workspace-tab-menu";
 import { useDesktopBrowserNewTabRequests } from "@/desktop/browser/new-tab-requests";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
+import { resolveWorkspaceFileCopyPath } from "@/utils/workspace-file-copy-path";
 import {
   resolveWorkspaceHeaderRenderState,
   type WorkspaceHeaderCheckoutState,
@@ -439,7 +440,7 @@ interface MobileWorkspaceTabSwitcherProps {
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
-  onCopyFilePath: (path: string) => Promise<void> | void;
+  onCopyFilePath: (input: { path: string; directory?: string }) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -567,7 +568,7 @@ function MobileWorkspaceTabOption({
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
-  onCopyFilePath: (path: string) => Promise<void> | void;
+  onCopyFilePath: (input: { path: string; directory?: string }) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -2851,7 +2852,8 @@ function WorkspaceScreenContent({
   );
 
   const handleCopyFilePath = useCallback(
-    async (path: string) => {
+    async (input: { path: string; directory?: string }) => {
+      const path = resolveWorkspaceFileCopyPath({ ...input, workspaceDirectory });
       if (!path) return;
       try {
         await Clipboard.setStringAsync(path);
@@ -2860,7 +2862,7 @@ function WorkspaceScreenContent({
         toast.error(t("workspace.tabs.toasts.copyFailed"));
       }
     },
-    [toast, t],
+    [toast, t, workspaceDirectory],
   );
 
   const handleCopyResumeCommand = useCallback(
